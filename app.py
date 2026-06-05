@@ -130,8 +130,9 @@ def _scheduler_loop():
                         pid = tiktok_post_video(refresh_token_if_needed(u),
                                                 p["file"], p["title"], p["mode"])
                         status = "enviado"
-                    except Exception:  # noqa: BLE001
-                        status = "erro"
+                    except Exception as e:  # noqa: BLE001
+                        status, pid = "erro", str(e)[:180]
+                        print(f"[wizposter] erro no agendado {p['id']}: {e}", flush=True)
                 with db() as c:
                     c.execute("UPDATE posts SET status=?, publish_id=? WHERE id=?",
                               (status, pid, p["id"]))
@@ -257,7 +258,9 @@ def dashboard(session: str | None = Cookie(default=None)):
     rows = "".join(
         f"<tr><td>{p['title'][:38]}</td><td>{'Publicação' if p['mode']=='direct' else 'Rascunho'}</td>"
         f"<td>{p['scheduled_at'] or 'imediato'}</td>"
-        f"<td><span class='tag {p['status']}'>{p['status']}</span></td></tr>"
+        f"<td><span class='tag {p['status']}' title=\"{(p['publish_id'] or '')[:160]}\">{p['status']}</span>"
+        + (f"<div style='color:#ff6b81;font-size:11px;max-width:300px'>{p['publish_id'][:120]}</div>"
+           if p['status'] == 'erro' and p['publish_id'] else "") + "</td></tr>"
         for p in posts) or "<tr><td colspan=4 style='color:#777'>Nenhum envio ainda.</td></tr>"
     avatar = u["avatar_url"] or "https://placehold.co/44"
     nav = (f"<div class='user'><img src='{avatar}'><b>@{u['display_name']}</b>"
@@ -305,8 +308,9 @@ async def post_video(background_tasks: BackgroundTasks,
             try:
                 pid = tiktok_post_video(refresh_token_if_needed(u), str(dest), title, mode)
                 status = "enviado"
-            except Exception:  # noqa: BLE001
-                pass
+            except Exception as e:  # noqa: BLE001
+                pid = str(e)[:180]
+                print(f"[wizposter] erro no envio do post {post_id}: {e}", flush=True)
             with db() as c:
                 c.execute("UPDATE posts SET status=?, publish_id=? WHERE id=?",
                           (status, pid, post_id))
