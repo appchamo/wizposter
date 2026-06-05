@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: wizposter
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: BASE_URL
+        value: https://app.wizmidia.com.br
+      - key: TIKTOK_CLIENT_KEY
+        sync: false
+      - key: TIKTOK_CLIENT_SECRET
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
