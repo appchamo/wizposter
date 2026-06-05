@@ -86,29 +86,41 @@ def refresh_token_if_needed(u: sqlite3.Row) -> dict:
 
 
 def tiktok_post_video(u: dict, path: str, title: str, mode: str) -> str:
-    """mode: 'draft' (caixa de rascunhos) | 'direct' (publica no perfil)."""
+    """mode: 'draft' (caixa de rascunhos) | 'direct' (publica no perfil).
+    Vídeos >64MB são enviados em pedaços (regra da API)."""
     headers = {"Authorization": f"Bearer {u['access_token']}",
                "Content-Type": "application/json; charset=UTF-8"}
     size = Path(path).stat().st_size
+    max_single = 64 * 1024 * 1024
+    if size <= max_single:
+        chunk_size, total_chunks = size, 1
+    else:
+        chunk_size = 10 * 1024 * 1024           # 10MB por pedaço
+        total_chunks = size // chunk_size       # último pedaço absorve a sobra
+    src = {"source": "FILE_UPLOAD", "video_size": size,
+           "chunk_size": chunk_size, "total_chunk_count": total_chunks}
     if mode == "direct":
         endpoint, body = "post/publish/video/init/", {
             "post_info": {"title": title[:150], "privacy_level": "SELF_ONLY",
-                          "disable_comment": False},
-            "source_info": {"source": "FILE_UPLOAD", "video_size": size,
-                            "chunk_size": size, "total_chunk_count": 1}}
+                          "disable_comment": False}, "source_info": src}
     else:
-        endpoint, body = "post/publish/inbox/video/init/", {
-            "source_info": {"source": "FILE_UPLOAD", "video_size": size,
-                            "chunk_size": size, "total_chunk_count": 1}}
+        endpoint, body = "post/publish/inbox/video/init/", {"source_info": src}
     r = requests.post(f"{OPEN_API}/{endpoint}", headers=headers, json=body, timeout=60)
     data = r.json().get("data", {})
     if r.status_code != 200 or not data.get("upload_url"):
         raise RuntimeError(f"init {r.status_code}: {r.text[:200]}")
-    put = requests.put(data["upload_url"], data=Path(path).read_bytes(), timeout=300,
-                       headers={"Content-Type": "video/mp4",
-                                "Content-Range": f"bytes 0-{size-1}/{size}"})
-    if put.status_code not in (200, 201, 206):
-        raise RuntimeError(f"upload {put.status_code}")
+
+    with open(path, "rb") as fh:
+        for i in range(total_chunks):
+            start = i * chunk_size
+            end = size - 1 if i == total_chunks - 1 else start + chunk_size - 1
+            fh.seek(start)
+            blob = fh.read(end - start + 1)
+            put = requests.put(data["upload_url"], data=blob, timeout=600, headers={
+                "Content-Type": "video/mp4",
+                "Content-Range": f"bytes {start}-{end}/{size}"})
+            if put.status_code not in (200, 201, 206):
+                raise RuntimeError(f"upload pedaço {i+1}/{total_chunks}: {put.status_code}")
     return data.get("publish_id", "")
 
 
