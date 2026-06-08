@@ -125,29 +125,37 @@ def tiktok_post_video(u: dict, path: str, title: str, mode: str) -> str:
 
 
 # ---------------------------------------------------------------- agendador
+def _process_due() -> int:
+    """Envia todos os posts agendados cujo horário já chegou. Retorna quantos enviou.
+    Chamado por: thread de fundo, /cron (pinger externo) e ao abrir o painel."""
+    now = datetime.now().strftime("%Y-%m-%dT%H:%M")
+    with db() as c:
+        due = c.execute("SELECT * FROM posts WHERE status='agendado' AND "
+                        "scheduled_at<=?", (now,)).fetchall()
+    sent = 0
+    for p in due:
+        with db() as c:
+            u = c.execute("SELECT * FROM users WHERE open_id=?", (p["open_id"],)).fetchone()
+        status, pid = "erro", ""
+        if u:
+            try:
+                pid = tiktok_post_video(refresh_token_if_needed(u),
+                                        p["file"], p["title"], p["mode"])
+                status = "enviado"
+                sent += 1
+            except Exception as e:  # noqa: BLE001
+                status, pid = "erro", str(e)[:180]
+                print(f"[wizposter] erro no agendado {p['id']}: {e}", flush=True)
+        with db() as c:
+            c.execute("UPDATE posts SET status=?, publish_id=? WHERE id=?",
+                      (status, pid, p["id"]))
+    return sent
+
+
 def _scheduler_loop():
     while True:
         try:
-            now = datetime.now().strftime("%Y-%m-%dT%H:%M")
-            with db() as c:
-                due = c.execute("SELECT * FROM posts WHERE status='agendado' AND "
-                                "scheduled_at<=?", (now,)).fetchall()
-            for p in due:
-                with db() as c:
-                    u = c.execute("SELECT * FROM users WHERE open_id=?",
-                                  (p["open_id"],)).fetchone()
-                status, pid = "erro", ""
-                if u:
-                    try:
-                        pid = tiktok_post_video(refresh_token_if_needed(u),
-                                                p["file"], p["title"], p["mode"])
-                        status = "enviado"
-                    except Exception as e:  # noqa: BLE001
-                        status, pid = "erro", str(e)[:180]
-                        print(f"[wizposter] erro no agendado {p['id']}: {e}", flush=True)
-                with db() as c:
-                    c.execute("UPDATE posts SET status=?, publish_id=? WHERE id=?",
-                              (status, pid, p["id"]))
+            _process_due()
         except Exception:  # noqa: BLE001
             pass
         time.sleep(30)
@@ -259,11 +267,26 @@ def callback(code: str = "", error: str = ""):
     return resp
 
 
+@app.get("/cron")
+def cron():
+    """Pinger externo chama isso a cada 1 min p/ disparar os agendados
+    (mantém o app acordado no plano grátis do Render)."""
+    try:
+        n = _process_due()
+        return {"ok": True, "enviados": n}
+    except Exception as e:  # noqa: BLE001
+        return {"ok": False, "erro": str(e)[:200]}
+
+
 @app.get("/dashboard", response_class=HTMLResponse)
 def dashboard(session: str | None = Cookie(default=None)):
     u = current_user(session)
     if not u:
         return RedirectResponse("/")
+    try:
+        _process_due()   # dispara agendados vencidos ao abrir o painel
+    except Exception:  # noqa: BLE001
+        pass
     with db() as c:
         posts = c.execute("SELECT * FROM posts WHERE open_id=? ORDER BY id DESC LIMIT 20",
                           (u["open_id"],)).fetchall()
