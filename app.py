@@ -203,8 +203,8 @@ td,th{{padding:9px 6px;border-bottom:1px solid #26262f;text-align:left}}
 </style></head><body><div class="wrap">
 <div class="nav"><div class="logo">WIZ<span>POSTER</span></div>{nav}</div>{body}
 <p style="color:#555;font-size:12px;margin-top:40px">© Wiz Mídia — Patrocínio-MG ·
-<a href="https://www.wizmidia.com.br/termostk" style="color:#777">Termos</a> ·
-<a href="https://www.wizmidia.com.br/policytk" style="color:#777">Privacidade</a></p>
+<a href="/terms" style="color:#777">Termos</a> ·
+<a href="/privacy" style="color:#777">Privacidade</a></p>
 </div></body></html>"""
 
 
@@ -358,3 +358,79 @@ def logout():
     resp = RedirectResponse("/", status_code=303)
     resp.delete_cookie("session")
     return resp
+
+
+# ---------------------------------------------------------------- páginas legais
+_LEGAL_CSS = """*{box-sizing:border-box;margin:0}body{font-family:-apple-system,Segoe UI,Roboto,
+sans-serif;background:#0d0d12;color:#e8e8ea;line-height:1.65}.wrap{max-width:780px;margin:0 auto;
+padding:48px 22px}h1{font-size:30px;margin-bottom:6px}.logo{font-size:20px;font-weight:800;
+letter-spacing:1px;margin-bottom:30px}.logo span{color:#fe2c55}h2{font-size:19px;margin:26px 0 8px}
+small{color:#9a9aa2}p{margin:10px 0}a{color:#fe2c55}ul{margin:10px 0 10px 22px}li{margin:6px 0}
+.foot{margin-top:40px;color:#6a6a72;font-size:13px}"""
+
+
+def _legal_page(title: str, body_html: str) -> HTMLResponse:
+    return HTMLResponse(f"""<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>{title} — Wiz Poster</title>
+<style>{_LEGAL_CSS}</style></head><body><div class="wrap">
+<div class="logo">WIZ<span>POSTER</span></div>{body_html}
+<p class="foot">© Wiz Mídia — Patrocínio-MG, Brasil ·
+<a href="/">Início</a> · <a href="/terms">Termos</a> · <a href="/privacy">Privacidade</a></p>
+</div></body></html>""")
+
+
+@app.get("/terms", response_class=HTMLResponse)
+def terms():
+    return _legal_page("Termos de Uso", """
+    <h1>Termos de Uso</h1><small>Última atualização: 09/06/2026</small>
+    <p>O Wiz Poster é uma plataforma web operada pela Wiz Mídia que permite a criadores de
+    conteúdo conectar suas contas do TikTok e enviar, publicar e agendar seus próprios vídeos.
+    Ao usar o serviço, você concorda com estes Termos.</p>
+    <h2>1. Descrição do serviço</h2>
+    <p>Após autorização via login oficial do TikTok (OAuth), o criador pode enviar vídeos para
+    sua própria conta como rascunho ou publicação, imediatamente ou em horário agendado, por
+    meio da Content Posting API oficial do TikTok.</p>
+    <h2>2. Conta e autorização</h2>
+    <p>O serviço só acessa contas que o próprio criador autorizou explicitamente pelo fluxo
+    oficial do TikTok. A autorização pode ser revogada a qualquer momento.</p>
+    <h2>3. Uso adequado</h2>
+    <p>O usuário se compromete a enviar apenas conteúdo de sua autoria ou devidamente licenciado,
+    respeitando as Diretrizes da Comunidade e os Termos de Serviço do TikTok. O usuário é o único
+    responsável pelo conteúdo que publica.</p>
+    <h2>4. Garantias</h2>
+    <p>O serviço é fornecido "como está". A Wiz Mídia não se responsabiliza por indisponibilidades
+    do TikTok, suspensões de conta ou penalidades decorrentes do conteúdo publicado pelo usuário.</p>
+    <h2>5. Contato</h2>
+    <p>Dúvidas: <a href="mailto:raferaissa@gmail.com">raferaissa@gmail.com</a>.</p>""")
+
+
+@app.get("/privacy", response_class=HTMLResponse)
+def privacy():
+    return _legal_page("Política de Privacidade", """
+    <h1>Política de Privacidade</h1><small>Última atualização: 09/06/2026</small>
+    <p>Esta política descreve como o Wiz Poster, operado pela Wiz Mídia, trata os dados dos
+    criadores que usam a plataforma.</p>
+    <h2>1. Dados que coletamos</h2>
+    <ul>
+    <li>Dados básicos do perfil TikTok autorizados pelo criador (identificador da conta, nome de
+    exibição e avatar), obtidos via Login Kit oficial do TikTok;</li>
+    <li>Tokens de autorização (access token e refresh token) emitidos pelo TikTok;</li>
+    <li>Os vídeos e legendas que o criador envia para publicação.</li>
+    </ul>
+    <p>Não coletamos senhas (o login acontece no próprio TikTok), contatos nem dados de pagamento.</p>
+    <h2>2. Como usamos os dados</h2>
+    <p>Os dados são usados exclusivamente para operar o serviço: identificar a conta conectada e
+    enviar/publicar/agendar os vídeos que o próprio criador solicitar, sempre na conta dele. Não
+    usamos os dados para publicidade nem criação de perfis.</p>
+    <h2>3. Compartilhamento</h2>
+    <p>Não vendemos nem compartilhamos dados com terceiros. A única transmissão ocorre entre o
+    serviço e os servidores oficiais do TikTok, para executar as ações solicitadas pelo criador.</p>
+    <h2>4. Armazenamento e segurança</h2>
+    <p>Tokens e arquivos ficam na infraestrutura do serviço com acesso restrito, pelo tempo
+    necessário à operação. Vídeos enviados são mantidos apenas até a conclusão da publicação.</p>
+    <h2>5. Direitos e retenção</h2>
+    <p>O criador pode, a qualquer momento, desconectar sua conta no painel, revogar a autorização
+    nas configurações do TikTok ou pedir a exclusão dos dados pelo e-mail abaixo. Após revogação
+    ou exclusão, tokens e arquivos associados são removidos.</p>
+    <h2>6. Contato</h2>
+    <p>Dúvidas: <a href="mailto:raferaissa@gmail.com">raferaissa@gmail.com</a>.</p>""")
